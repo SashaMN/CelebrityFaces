@@ -101,10 +101,11 @@ Descriptor ToBinary(const std::vector<int> &mask) {
 
 Descriptor Query2Descriptor(
     const std::vector<double> &query,
-    const std::vector<std::vector<double>> &directions) {
+    const std::vector<std::vector<double>> &directions,
+    const std::vector<std::vector<double>> &biases) {
   std::vector<int> result_mask;
   for (int i = 0; i < directions.size(); ++i) {
-    double cur_value = 0.0;
+    double cur_value = biases[0][i];
     for (int j = 0; j < directions[i].size(); ++j) {
       cur_value += directions[i][j] * query[j];
     }
@@ -151,17 +152,19 @@ int main() {
   const std::string centroid2idx_file = "data/index/centroid2idx";
   const std::string filenames_file = "data/index/filenames";
   const std::string directions_file = "data/index/directions";
+  const std::string biases_file = "data/index/biases";
   const std::string descriptors_file = "data/index/descriptors";
 
   const auto centroids = ReadVectors<double>(centroids_file);
   const auto centroid2idx = ReadVectors<int>(centroid2idx_file);
   const auto filenames = ReadStrings(filenames_file);
   const auto directions = ReadVectors<double>(directions_file);
+  const auto biases = ReadVectors<double>(biases_file);
   const auto descriptors = ReadVectors<uint64_t>(descriptors_file);
   const auto query = ReadQuery();
   const auto neighbor_centroids = KNearestCentroids(query, centroids);
 
-  const auto query_descriptor = Query2Descriptor(query, directions);
+  const auto query_descriptor = Query2Descriptor(query, directions, biases);
 
   const auto nearest_neighbors = KNearestNeighbors(
       query_descriptor, neighbor_centroids, centroid2idx, descriptors);

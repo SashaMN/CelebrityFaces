@@ -43,6 +43,7 @@ def process(path):
             input=' '.join(map(str, values)).encode(),
             stdout=PIPE)
     closest_neighbors_id = list(map(int, p.stdout.decode().strip().split()))
+    # closest_neighbors_id = list(range(202599)) # for naive approach
     closest_neighbors = {
         path: [],
     }
