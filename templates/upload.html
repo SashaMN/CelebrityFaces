@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Find similarities</title>
+	<script
+		src="{{ url_for('static', filename = 'js/jquery-3.3.1.min.js') }}"></script>
+	<script src="{{ url_for('static', filename = 'js/croppie.min.js') }}"></script>
+	<script src="{{ url_for('static', filename = 'js/bootstrap.min.js') }}"></script>
+	<script src="{{ url_for('static', filename = 'js/custom.js') }}"></script>
+
+	<link rel="stylesheet"
+		href="{{ url_for('static', filename = 'css/croppie.css') }}" />
+		<link rel="stylesheet"
+		href="{{ url_for('static', filename = 'css/bootstrap.min.css') }}" />
+	<link rel="stylesheet"
+		href="{{ url_for('static', filename = 'css/custom.css') }}" />
+</head>
+<body>
+	<div style='width: 600px; margin: auto; padding-top: 150px;'>
+		<p style='font-family: Lucida Console; font-size: 20px;'>Choose
+			picture you want to find similarities for:</p>
+		<form action="/similarities" method="POST" enctype="multipart/form-data">
+		<div class="file_upload">
+		<button id="select-button" type="button">Select</button>
+		<div id="was-selected">The file was not selected</div>
+			<input id="inputFile" class="item-img" type="file" name="file"
+						accept="image/*" />
+		</div>
+		<div style='clear: both' />
+		<div id="cropped-image" style='text-align: center' hidden="true">
+			<img src="" class="gambar img-responsive img-thumbnail" id="item-img-output" />
+		</div>
+		<div id="cropped-image" style='text-align: center'>
+		<input type="submit" class="bt" />
+		<input type="hidden" id="base64-img" name="base64Img" value="" />
+		</div>
+		</form>
+	</div>
+	<div class="modal fade" id="cropImagePop" tabindex="-1" role="dialog"
+		aria-labelledby="myModalLabel" aria-hidden="true">
+		<div class="modal-dialog">
+			<div class="modal-content">
+				<div class="modal-header">
+					<button type="button" class="close" data-dismiss="modal"
+						aria-label="Close">
+						<span aria-hidden="true">&times;</span>
+					</button>
+					<h4 class="modal-title" id="myModalLabel">
+						<?=multiLanguage( "Edit Foto" , "Edit Photo" )?>
+					</h4>
+				</div>
+				<div class="modal-body">
+					<div id="upload-demo" class="center-block"></div>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+					<button type="button" id="cropImageBtn" class="btn btn-primary">Crop</button>
+				</div>
+			</div>
+		</div>
+	</div>
+	<script>
+		var uploadCrop, imageId, tempFilename, rawImg;
+		function readFile(input) {
+			if (input.files && input.files[0]) {
+				if (input.files[0]['type'].startsWith("image/")) {
+					var reader = new FileReader();
+					reader.onload = function(e) {
+						$('.upload-demo').addClass('ready');
+						$('#cropImagePop').modal('show');
+						rawImg = e.target.result;
+					}
+					reader.readAsDataURL(input.files[0]);
+				} else {
+					
+				}
+			}
+		}
+		uploadCrop = $('#upload-demo').croppie({
+			enableExif : true,
+			enableResize : true
+		});
+		$('#cropImagePop').on('shown.bs.modal', function() {
+			uploadCrop.croppie('bind', {
+				url : rawImg
+			}).then(function() {
+				console.log('jQuery bind complete');
+			});
+		});
+
+		$('.item-img').on('change', function() {
+			imageId = $(this).data('id');
+			tempFilename = $(this).val();
+			$('#cancelCropBtn').data('id', imageId);
+			readFile(this);
+		});
+		$('#cropImageBtn').on('click', function(ev) {
+			uploadCrop.croppie('result', {
+				type : 'base64',
+				format : 'jpeg',
+				size : {
+					height : 200
+				}
+			}).then(function(resp) {
+				$('#item-img-output').attr('src', resp);
+				$('#base64-img').attr('value', resp);
+				$('#cropped-image').attr('hidden', false);
+				$('#was-selected').text("Next image was selected")
+				$('#select-button').text("Select other")
+				$('#cropImagePop').modal('hide');
+			});
+		});
+	</script>
+</body>
+</html>

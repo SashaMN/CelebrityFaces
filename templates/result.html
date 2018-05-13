@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Result</title>
+<link rel="stylesheet"
+	href="{{ url_for('static', filename = 'css/custom.css') }}" />
+</head>
+<body>
+	<table>
+		{% for key, value in result.items() %}
+		<tr>
+			<td><img src="{{ url_for('static', filename = 'data/' + key) }}"
+				height="180px" class='img_star' /></td> {% for v in value %}
+			<td class='prod' style='align: center'><img
+				src="{{ url_for('static', filename = 'img/' + v[1]) }}"
+				height="160px" /> </br>
+				<p style="text-align:center">{{ v[0] }}</p></td> {% endfor %}
+		</tr>
+		{% endfor %}
+	</table>
+</body>
+</html>
