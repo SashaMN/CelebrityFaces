@@ -23,3 +23,5 @@ To process new image:
 3. Compute Hamming distance in the compressed descriptors space between the query and all the images in the nearest centroids.
 4. Take top N=100 images and sort them using full descriptions by euclidean distance.
 5. Output top 5 images.
+
+This algo implemented in C++.
