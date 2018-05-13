@@ -13,7 +13,8 @@ META_FILE = "model/20170512-110547/model-20170512-110547.meta"
 CKPT_FILE = "model/20170512-110547/model-20170512-110547.ckpt-250000"
 
 def load_model(meta_file, ckpt_file):
-    sess = tf.Session()
+    gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.125)
+    sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
     saver = tf.train.import_meta_graph(meta_file)
     saver.restore(sess, ckpt_file)
     return sess
