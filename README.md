@@ -10,7 +10,7 @@ Our algorithm:
 Naive approach:
 ![alt text](https://github.com/SashaMN/CelebrityFaces/raw/master/naive.png)
 
-#Algorithm
+# Algorithm
 To build index:
 1. Extract embeddings.
 2. Cluster them with K-means algo into K=450 centroids.
