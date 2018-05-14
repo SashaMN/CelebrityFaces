@@ -35,6 +35,22 @@ def upload_file():
         img.save(path)
         return render_template('result.html', result = process(oldF.filename))
 
+def build_output(closest_neighbors_id, values):
+    scores = []
+    for i in closest_neighbors_id:
+        score = ((embeddings[i, :] - np.array(values)) ** 2).sum()
+        scores.append(score)
+
+    res = []
+    idx = np.argsort(scores)[:5]
+    for i in idx:
+        cur_id = closest_neighbors_id[i]
+        prob = RBF(scores[i]) * 100
+        res.append(("{0:.2f}%".format(prob),
+            filenames[cur_id]))
+    
+    return res
+
 def process(path):
     full_path = os.path.join('static/data', path)
     response = requests.post(url="http://127.0.0.1:50001", files = {'file': open(full_path, 'rb')})
@@ -42,25 +58,16 @@ def process(path):
     p = run(['bin/index_server'],
             input=' '.join(map(str, values)).encode(),
             stdout=PIPE)
-    closest_neighbors_id = list(map(int, p.stdout.decode().strip().split()))
-    # closest_neighbors_id = list(range(202599)) # for naive approach
+    
     closest_neighbors = {
         path: [],
     }
-
-    scores = []
-    for i in closest_neighbors_id:
-        score = ((embeddings[i, :] - np.array(values)) ** 2).sum()
-        scores.append(score)
-
-    idx = np.argsort(scores)[:5]
-    for i in idx:
-        cur_id = closest_neighbors_id[i]
-        prob = RBF(scores[i]) * 100
-        closest_neighbors[path].append(("{0:.2f}%".format(prob),
-            filenames[cur_id]))
-
-
+    for closest_neighbors_id in [
+            list(map(int, p.stdout.decode().strip().split())),
+            list(range(202599)), # for naive approach
+            ]:
+        closest_neighbors[path].append(
+                build_output(closest_neighbors_id, values))
     return closest_neighbors
 
 if __name__ == '__main__':
