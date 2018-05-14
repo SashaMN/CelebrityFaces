@@ -21,8 +21,9 @@ To build index:
 To process new image:
 1. Load all the data in the memory from prev. algo.
 2. Find top (K=10 out of 450) nearest centroids.
-3. Compute Hamming distance in the compressed descriptors space between the query and all the images in the nearest centroids for each of 8 64-bit numbers.
-4. Take top N=10 images from each table and sort them using full descriptions by euclidean distance.
-5. Output top 5 images.
+3. For each nearest centroid subtract centroid's center from the query.
+4. Compute Hamming distance in the compressed descriptors space between the query and all the images in the nearest centroids for each of 8 64-bit numbers.
+5. Take top N=10 images from each table and sort them using full descriptions by euclidean distance.
+6. Output top 5 images.
 
 This algo implemented in C++.
