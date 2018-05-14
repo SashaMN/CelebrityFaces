@@ -4,24 +4,45 @@
 #include <fstream>
 #include <sstream>
 #include <algorithm>
+#include <set>
 
 using Centroid = std::vector<double>;
 using Centroids = std::vector<Centroid>;
 using Descriptor = std::vector<uint64_t>;
+using Descriptors = std::vector<Descriptor>;
+
+struct IndexData {
+  Centroids centroids;
+  std::vector<std::vector<int>> centroid2idx;
+  std::vector<std::string> filenames;
+  std::vector<std::vector<double>> directions;
+  std::vector<double> biases;
+  Descriptors descriptors;
+};
 
 template <typename T>
-std::vector<std::vector<T>> ReadVectors(
-    const std::string &filename) {
+std::vector<T> ReadVector(const std::string &filename) {
+  std::vector<T> result;
+  std::ifstream ifs(filename);
+  T value = 0.0;
+  while (ifs >> value) {
+    result.push_back(value);
+  }
+  return result;
+}
+
+template <typename T>
+std::vector<std::vector<T>> ReadVectors(const std::string &filename) {
   std::vector<std::vector<T>> result;
   std::ifstream ifs(filename);
-  int num_centroids = 0;
+  int cur_size = 0;
   for (std::string line; std::getline(ifs, line);) {
     result.emplace_back(std::vector<T>());
-    ++num_centroids;
+    ++cur_size;
     std::istringstream iss(line);
     T value = 0.0;
     while (iss >> value) {
-      result[num_centroids - 1].push_back(value);
+      result[cur_size - 1].push_back(value);
     }
   } 
   return result;
@@ -45,6 +66,24 @@ std::vector<double> ReadQuery(size_t query_len=128) {
     result[i] = value;
   }
   return result;
+}
+
+IndexData ReadIndexData() {
+  const std::string centroids_file = "data/index/centroids";
+  const std::string centroid2idx_file = "data/index/centroid2idx";
+  const std::string filenames_file = "data/index/filenames";
+  const std::string directions_file = "data/index/directions";
+  const std::string biases_file = "data/index/biases";
+  const std::string descriptors_file = "data/index/descriptors";
+
+  IndexData index_data;
+  index_data.centroids = ReadVectors<double>(centroids_file);
+  index_data.centroid2idx = ReadVectors<int>(centroid2idx_file);
+  index_data.filenames = ReadStrings(filenames_file);
+  index_data.directions = ReadVectors<double>(directions_file);
+  index_data.biases = ReadVector<double>(biases_file);
+  index_data.descriptors = ReadVectors<uint64_t>(descriptors_file);
+  return index_data;
 }
 
 double l2norm(
@@ -71,7 +110,7 @@ std::vector<int> ArgSort(
 std::vector<int> KNearestCentroids(
     const std::vector<double> &query,
     const Centroids &centroids,
-    int count = 20) {
+    int count = 10) {
   auto centroids_count = centroids.size();
   std::vector<double> distances(centroids_count);
   for (int i = 0; i < centroids_count; ++i) {
@@ -101,11 +140,12 @@ Descriptor ToBinary(const std::vector<int> &mask) {
 
 Descriptor Query2Descriptor(
     const std::vector<double> &query,
-    const std::vector<std::vector<double>> &directions,
-    const std::vector<std::vector<double>> &biases) {
+    const IndexData &index_data) {
+  const auto &directions = index_data.directions;
+  const auto &biases = index_data.biases;
   std::vector<int> result_mask;
   for (int i = 0; i < directions.size(); ++i) {
-    double cur_value = biases[0][i];
+    double cur_value = biases[i];
     for (int j = 0; j < directions[i].size(); ++j) {
       cur_value += directions[i][j] * query[j];
     }
@@ -114,60 +154,75 @@ Descriptor Query2Descriptor(
   return ToBinary(result_mask);
 }
 
-int HammingDistance(
-    const Descriptor &first,
-    const Descriptor &second) {
+int HammingDistance(uint64_t first, uint64_t second) {
+  /*
   int result = 0;
   for (int i = 0; i < first.size(); ++i) {
     result += __builtin_popcount(first[i] ^ second[i]);
   }
   return result;
+  */
+  return __builtin_popcount(first ^ second);
 }
 
 std::vector<int> KNearestNeighbors(
     const Descriptor &query_descriptor,
-    const std::vector<int> &centroids_idx,
-    const std::vector<std::vector<int>> &centroid2idx,
-    const std::vector<Descriptor> &descriptors,
-    int count = 100) {
-  std::vector<int> images_idx;
-  std::vector<int> distances;
-  for (int idx : centroids_idx) {
-    for (int image_idx : centroid2idx[idx]) {
-      images_idx.push_back(image_idx);
+    const Descriptors &descriptors,
+    const std::vector<int> &images_id,
+    int count) {
+  const int NUM_TABLES = 8;
+  std::set<int> result;
+  for (int i = 0; i < NUM_TABLES; ++i) {
+    std::vector<int> distances;
+    for (int image_id : images_id) {
       distances.push_back(HammingDistance(
-            query_descriptor, descriptors[image_idx]));
+          query_descriptor[i], descriptors[image_id][i]));
+    }
+    const auto sorted_args = ArgSort<int>(distances);
+    for (int i = 0; i < count; ++i) {
+      result.insert(images_id[sorted_args[i]]);
     }
   }
-  const auto sorted_args = ArgSort<int>(distances);
-  std::vector<int> result(count);
-  for (int i = 0; i < count; ++i) {
-    result[i] = images_idx[sorted_args[i]];
+  return std::vector<int>(result.begin(), result.end());
+}
+
+std::vector<double> ShiftQuery(
+    const std::vector<double> &query,
+    const std::vector<double> &centroid) {
+  std::vector<double> result(query.size());
+  for (int i = 0; i < query.size(); ++i) {
+    result[i] = query[i] - centroid[i];
+  }
+  return result;
+}
+
+std::vector<int> KNNInCentroids(
+    const std::vector<double> &query,
+    const std::vector<int> &centroids_id,
+    const IndexData &index_data,
+    int count = 10) {
+  const auto &centroids = index_data.centroids;
+  const auto &descriptors = index_data.descriptors;
+  const auto &centroid2idx = index_data.centroid2idx;
+
+  std::vector<int> result;
+  for (int centroid_id : centroids_id) {
+    const auto &shifted_query = ShiftQuery(query, centroids[centroid_id]);
+    const auto query_descriptor = Query2Descriptor(shifted_query, index_data);
+    const auto neighbors = KNearestNeighbors(
+        query_descriptor, descriptors, centroid2idx[centroid_id], count);
+    result.insert(result.end(), neighbors.begin(), neighbors.end());
   }
   return result;
 }
 
 int main() {
-  const std::string centroids_file = "data/index/centroids";
-  const std::string centroid2idx_file = "data/index/centroid2idx";
-  const std::string filenames_file = "data/index/filenames";
-  const std::string directions_file = "data/index/directions";
-  const std::string biases_file = "data/index/biases";
-  const std::string descriptors_file = "data/index/descriptors";
-
-  const auto centroids = ReadVectors<double>(centroids_file);
-  const auto centroid2idx = ReadVectors<int>(centroid2idx_file);
-  const auto filenames = ReadStrings(filenames_file);
-  const auto directions = ReadVectors<double>(directions_file);
-  const auto biases = ReadVectors<double>(biases_file);
-  const auto descriptors = ReadVectors<uint64_t>(descriptors_file);
+  const auto index_data = ReadIndexData();
   const auto query = ReadQuery();
-  const auto neighbor_centroids = KNearestCentroids(query, centroids);
-
-  const auto query_descriptor = Query2Descriptor(query, directions, biases);
-
-  const auto nearest_neighbors = KNearestNeighbors(
-      query_descriptor, neighbor_centroids, centroid2idx, descriptors);
+  const auto neighbor_centroids = KNearestCentroids(
+      query, index_data.centroids);
+  const auto nearest_neighbors = KNNInCentroids(
+      query, neighbor_centroids, index_data);
 
   for (auto neighbor : nearest_neighbors) {
     std::cout << neighbor << " ";
