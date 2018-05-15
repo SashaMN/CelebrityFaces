@@ -58,17 +58,10 @@ def process(path):
     p = run(['bin/index_server'],
             input=' '.join(map(str, values)).encode(),
             stdout=PIPE)
-    
-    closest_neighbors = {
-        path: [],
+    return {
+        ("Our approach", path): build_output(list(map(int, p.stdout.decode().strip().split())), values),
+        ("Naive approach", path): build_output(list(range(202599)), values)
     }
-    for closest_neighbors_id in [
-            list(map(int, p.stdout.decode().strip().split())),
-            list(range(202599)), # for naive approach
-            ]:
-        closest_neighbors[path].append(
-                build_output(closest_neighbors_id, values))
-    return closest_neighbors
 
 if __name__ == '__main__':
     app.run(host='95.213.170.235', debug=False, port=50002)
